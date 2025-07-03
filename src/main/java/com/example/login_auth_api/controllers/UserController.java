@@ -6,11 +6,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/user")
 public class UserController {
     @GetMapping
     public ResponseEntity <String> getUser(){
         // Implementar lógica para obter detalhes do usuário
-        return ResponseEntity.ok("sucesso");
+        return ResponseEntity.ok("sucesso!");
     }
 }

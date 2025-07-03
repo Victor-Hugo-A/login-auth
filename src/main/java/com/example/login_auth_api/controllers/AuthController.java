@@ -40,6 +40,19 @@ public class AuthController {
 
         @PostMapping("/register")
             public ResponseEntity<ResponseDTO> register(@RequestBody RegisterRequestDTO body) {
+                // Verifica se já existe um usuário com o mesmo email no banco de dados
+                if (repository.findByEmail(body.email()).isPresent()) {
+                    return ResponseEntity
+                    .badRequest()
+                    .body(new ResponseDTO("Já existe um usuário cadastrado com esse EMAIL", null));
+                }
+
+                // Verfica se já existe usuário com o mesmo name no banco de dados
+                if (repository.findByName(body.name()).isPresent()) {
+                    return ResponseEntity
+                    .badRequest()
+                    .body(new ResponseDTO("Já existe um usuário cadastrado com esse NOME", null));
+                }
                 // Sua lógica de autenticação aqui
                 Optional<User> user = this.repository.findByEmail(body.email());
 
