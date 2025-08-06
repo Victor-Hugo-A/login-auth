@@ -6,10 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.example.login_auth_api.domain.user.User;
-import com.example.login_auth_api.dto.LoginRequestDTO;
-import com.example.login_auth_api.dto.RegisterRequestDTO;
-import com.example.login_auth_api.dto.ResetPasswordDTO;
-import com.example.login_auth_api.dto.ResponseDTO;
+import com.example.login_auth_api.dto.*;
 import com.example.login_auth_api.domain.user.PasswordResetToken;
 import com.example.login_auth_api.repositories.PasswordResetTokenRepositories;
 import com.example.login_auth_api.repositories.UserRepositories;
@@ -19,6 +16,7 @@ import com.example.login_auth_api.infra.security.TokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,50 +37,50 @@ public class AuthController {
     private final EmailService emailService;
 
     @PostMapping("/login")
-        public ResponseEntity<ResponseDTO> login(@RequestBody LoginRequestDTO body) {
-            // Sua lógica de autenticação aqui
-            User user = this.repository.findByEmail(body.email()).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-            if(passwordEncoder.matches(body.password(), user.getPassword())) {
-                String token = this.tokenService.generateToken(user);
-                return ResponseEntity.ok(new ResponseDTO(user.getName(), token));
-            }
-            return ResponseEntity.badRequest().build();
+    public ResponseEntity<ResponseDTO> login(@RequestBody LoginRequestDTO body) {
+        // Sua lógica de autenticação aqui
+        User user = this.repository.findByEmail(body.email()).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        if(passwordEncoder.matches(body.password(), user.getPassword())) {
+            String token = this.tokenService.generateToken(user);
+            return ResponseEntity.ok(new ResponseDTO(user.getName(), token));
         }
+        return ResponseEntity.badRequest().build();
+    }
 
     @PostMapping("/register")
-        public ResponseEntity<ResponseDTO> register(@RequestBody RegisterRequestDTO body) {
-            // Verifica se já existe um usuário com o mesmo email no banco de dados
-            if (repository.findByEmail(body.email()).isPresent()) {
-                return ResponseEntity
-                .badRequest()
-                .body(new ResponseDTO("Já existe um usuário cadastrado com esse EMAIL", null));
-            }
+    public ResponseEntity<ResponseDTO> register(@RequestBody RegisterRequestDTO body) {
+        // Verifica se já existe um usuário com o mesmo email no banco de dados
+        if (repository.findByEmail(body.email()).isPresent()) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new ResponseDTO("Já existe um usuário cadastrado com esse EMAIL", null));
+        }
 
-            // Sua lógica de autenticação aqui
-            Optional<User> user = this.repository.findByEmail(body.email());
+        // Sua lógica de autenticação aqui
+        Optional<User> user = this.repository.findByEmail(body.email());
 
-            if(user.isEmpty()) {
+        if(user.isEmpty()) {
             User newUser = new User();
             newUser.setPassword(passwordEncoder.encode(body.password()));
             newUser.setEmail(body.email());
             newUser.setName(body.name());
             this.repository.save(newUser);
 
-                String token = this.tokenService.generateToken(newUser);
-                return ResponseEntity.ok(new ResponseDTO(newUser.getName(), token));
-            }
-            return ResponseEntity.badRequest().build();
+            String token = this.tokenService.generateToken(newUser);
+            return ResponseEntity.ok(new ResponseDTO(newUser.getName(), token));
         }
+        return ResponseEntity.badRequest().build();
+    }
 
     @PostMapping("/forgot")
-        public ResponseEntity<ResponseDTO> forgotPassword(@RequestBody Map<String, String> request) {
+    public ResponseEntity<ResponseDTO> forgotPassword(@RequestBody Map<String, String> request) {
 
-            try {
+        try {
             String email = request.get("email");
 
             if (email == null || email.isEmpty()) {
                 return ResponseEntity.badRequest()
-                .body(new ResponseDTO("O e-mail é obrigatório", null));
+                        .body(new ResponseDTO("O e-mail é obrigatório", null));
             }
 
             Optional<User> userOptional = this.repository.findByEmail(email);
@@ -91,60 +89,62 @@ public class AuthController {
                 String token = UUID.randomUUID().toString();
 
                 PasswordResetToken resetTokenEntity = new PasswordResetToken(
-                    token,
-                    user,
-                    LocalDateTime.now().plusHours(24) // Expirando em 24hrs
+                        token,
+                        user,
+                        LocalDateTime.now().plusHours(24) // Expirando em 24h
                 );
                 PasswordResetTokenRepository.save(resetTokenEntity);
 
                 String resetLink = "http://localhost:4200/forgot?token=" + token;
                 emailService.sendPasswordResetEmail(user.getEmail(), resetLink);
             }
-
-                return ResponseEntity.ok(new ResponseDTO("Se o email estiver cadastrado, você receberá um link de recuperação", null));
-            } catch (Exception e) {
-                log.error("Erro ao processar recuperação de senha", e);
-                return ResponseEntity.internalServerError()
-                .body(new ResponseDTO("Erro ao processar sua solicitação", null));
-            }
+            return ResponseEntity.ok(new ResponseDTO("Se o email estiver cadastrado, você receberá um link de recuperação", null));
+        } catch (Exception e) {
+            log.error("Erro ao processar recuperação de senha", e);
+            return ResponseEntity.internalServerError()
+                    .body(new ResponseDTO("Erro ao processar sua solicitação", null));
         }
+    }
 
     @PostMapping("/reset")
-        public ResponseEntity<ResponseDTO> resetPassword(@RequestBody ResetPasswordDTO request) {
-            try {
-                PasswordResetToken resetToken = PasswordResetTokenRepository.findByToken(request.token())
+    public ResponseEntity<ResponseDTO> resetPassword(@RequestBody ResetPasswordDTO request) {
+        try {
+            PasswordResetToken resetToken = PasswordResetTokenRepository.findByToken(request.token())
                     .orElseThrow(() -> new RuntimeException("Token inválido"));
 
-                if (resetToken.getExpTime().isBefore(LocalDateTime.now())) {
-                    throw new RuntimeException("Token expirado");
-                }
-
-                User user = resetToken.getUser();
-                user.setPassword(passwordEncoder.encode(request.newPassword()));
-                repository.save(user);
-
-                PasswordResetTokenRepository.delete(resetToken);
-
-                return ResponseEntity.ok()
-                    .body(new ResponseDTO("Senha redefinida com sucesso", null));
-                
-            } catch (Exception e) {
-                log.error("Erro ao redefinir senha", e);
-                return ResponseEntity.badRequest()
-                    .body(new ResponseDTO(e.getMessage(), null));
+            if (resetToken.getExpTime().isBefore(LocalDateTime.now())) {
+                throw new RuntimeException("Token expirado");
             }
+
+            User user = resetToken.getUser();
+            user.setPassword(passwordEncoder.encode(request.newPassword()));
+            repository.save(user);
+
+            PasswordResetTokenRepository.delete(resetToken);
+
+            return ResponseEntity.ok()
+                    .body(new ResponseDTO("Senha redefinida com sucesso", null));
+
+        } catch (Exception e) {
+            log.error("Erro ao redefinir senha", e);
+            return ResponseEntity.badRequest()
+                    .body(new ResponseDTO(e.getMessage(), null));
         }
+    }
 
 
     @DeleteMapping("/delete")
-        public ResponseEntity<ResponseDTO> deleteUser(@RequestBody Map<String, String> body) {
-            String email = body.get("email");
-            Optional<User> user = repository.findByEmail(email);
-            if (user.isPresent()) {
-                repository.delete(user.get());
-                return ResponseEntity.ok(new ResponseDTO("Usuário deletado com sucesso!", null));
-            } else {
-                return ResponseEntity.badRequest().body(new ResponseDTO("Usuário não encontrado.", null));
-            }
+    public ResponseEntity<ResponseDTO> deleteUser(@RequestBody DeleteDTO body) {
+        String email = body.getEmail();
+        Optional<User> user = repository.findByEmail(email);
+        if (user.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseDTO("Usuário não encontrado", null));
+        }
+         try {
+             repository.delete(user.get());
+             return ResponseEntity.ok(new ResponseDTO("Usuário deletado com sucesso!", null));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ResponseDTO("Erro ao deletar usuário", null));
         }
     }
+}
