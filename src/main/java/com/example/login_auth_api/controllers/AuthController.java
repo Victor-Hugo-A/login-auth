@@ -49,6 +49,11 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<ResponseDTO> register(@RequestBody RegisterRequestDTO body) {
+        // Validação de senha (mínimo 6 caracteres)
+        if (body.password().length() < 6) {
+            return ResponseEntity.badRequest().body(new ResponseDTO("O password necessita ter 6 caracteres", null));
+        }
+
         // Verifica se já existe um usuário com o mesmo email no banco de dados
         if (repository.findByEmail(body.email()).isPresent()) {
             return ResponseEntity
@@ -56,10 +61,7 @@ public class AuthController {
                     .body(new ResponseDTO("Já existe um usuário cadastrado com esse EMAIL", null));
         }
 
-        // Sua lógica de autenticação aqui
-        Optional<User> user = this.repository.findByEmail(body.email());
-
-        if(user.isEmpty()) {
+        try {
             User newUser = new User();
             newUser.setPassword(passwordEncoder.encode(body.password()));
             newUser.setEmail(body.email());
@@ -68,8 +70,9 @@ public class AuthController {
 
             String token = this.tokenService.generateToken(newUser);
             return ResponseEntity.ok(new ResponseDTO(newUser.getName(), token));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ResponseDTO("Erro ao registrar usuário", null ));
         }
-        return ResponseEntity.badRequest().build();
     }
 
     @PostMapping("/forgot")
