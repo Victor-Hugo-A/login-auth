@@ -13,6 +13,7 @@ import com.example.login_auth_api.repositories.UserRepositories;
 import com.example.login_auth_api.services.EmailService;
 import com.example.login_auth_api.infra.security.TokenService;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -39,7 +40,8 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ResponseDTO> login(@RequestBody LoginRequestDTO body) {
         // Sua lógica de autenticação aqui
-        User user = this.repository.findByEmail(body.email()).orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        User user = this.repository.findByEmail(body.email()).orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+
         if(passwordEncoder.matches(body.password(), user.getPassword())) {
             String token = this.tokenService.generateToken(user);
             return ResponseEntity.ok(new ResponseDTO(user.getName(), token));
