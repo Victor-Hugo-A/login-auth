@@ -5,6 +5,7 @@ import java.time.ZoneOffset;
 import java.time.Instant;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 
 import com.auth0.jwt.JWT;
@@ -27,7 +28,7 @@ public class TokenService {
 
     public String generateToken(User user) {
         try {
-            Algorithm algorithm = Algorithm.HMAC256(secret); 
+            Algorithm algorithm = Algorithm.HMAC256(secret);
 
             String token = JWT.create()
                 .withIssuer("login-auth-api")
@@ -42,14 +43,20 @@ public class TokenService {
 
     public String validateToken (String token) {
         try {
+            // Remove o prefixo "Bearer " se existir
+            if (token != null && token.startsWith("Bearer ")) {
+                token = token.substring(7);
+            }
+            // Configura o algoritmo de verificação
             Algorithm algorithm = Algorithm.HMAC256(secret);
+            assert token != null;
             return JWT.require(algorithm)
                 .withIssuer("login-auth-api")
                 .build()
                 .verify(token)
                 .getSubject();
-        } catch (Exception exception) {
-            throw new RuntimeException("Invalid JWT token");
+        } catch (AuthenticationException e) {
+            throw new RuntimeException(e.getMessage());
         }
     }
 

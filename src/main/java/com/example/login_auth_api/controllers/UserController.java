@@ -11,6 +11,6 @@ public class UserController {
     @GetMapping
     public ResponseEntity <String> getUser(){
         // Implementar lógica para obter detalhes do usuário
-        return ResponseEntity.ok("sucesso!");
+        return ResponseEntity.ok("Token de usuário válido!");
     }
 }
